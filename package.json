@@ -1,0 +1,14 @@
+{
+  "name": "payhub",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all":   "npm i --prefix contracts && npm i --prefix backend && npm i --prefix frontend",
+    "compile":       "npm run compile --prefix contracts",
+    "test":          "npm test --prefix contracts",
+    "deploy:testnet":"npm run deploy:testnet --prefix contracts",
+    "backend:dev":   "npm run dev --prefix backend",
+    "frontend:dev":  "npm run dev --prefix frontend",
+    "dev": "start cmd /k \"npm run backend:dev\" && start cmd /k \"npm run frontend:dev\""
+  }
+}

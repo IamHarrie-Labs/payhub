@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* ─── Design tokens (dark theme for demo + dashboard) ─── */
+:root {
+  --brand:       #6d28d9;
+  --brand-light: #8b5cf6;
+  --brand-dark:  #4c1d95;
+  --success:     #10b981;
+  --warning:     #f59e0b;
+  --danger:      #ef4444;
+  --muted:       #6b7280;
+  --surface:     #111827;
+  --surface-2:   #1f2937;
+  --surface-3:   #374151;
+  --border:      #374151;
+  --text:        #f9fafb;
+  --text-muted:  #9ca3af;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Landing page entrance animations ─────────────────── */
+@keyframes ph-fadein {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ph-a  { animation: ph-fadein 0.65s ease both; }
+.ph-d0 { animation-delay: 0ms; }
+.ph-d1 { animation-delay: 90ms; }
+.ph-d2 { animation-delay: 180ms; }
+.ph-d3 { animation-delay: 270ms; }
+.ph-d4 { animation-delay: 360ms; }
+.ph-d5 { animation-delay: 450ms; }
+.ph-d6 { animation-delay: 560ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ph-a { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+/* ─── Feature card hover ─────────────────────────────────── */
+.ph-card {
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+.ph-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 44px -20px rgba(13,17,23,0.22);
+}
