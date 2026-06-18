@@ -95,6 +95,7 @@ function ComplianceRow({ label, status, detail }) {
 export default function DemoPage() {
   const [wallet,       setWallet]       = useState(null);
   const [connecting,   setConnecting]   = useState(false);
+  const [walletOpen,   setWalletOpen]   = useState(false);
   const [step,         setStep]         = useState(0);
   const [busy,         setBusy]         = useState(false);
   const [error,        setError]        = useState(null);
@@ -111,17 +112,16 @@ export default function DemoPage() {
 
   const err = (msg) => { setError(msg); setBusy(false); };
 
-  async function connectWalletClick(type = "injected") {
+  async function connectWalletClick(id) {
     setConnecting(true); setError(null);
     try {
-      let w;
-      if (type === "walletconnect") {
-        w = await connectWalletConnect();
-      } else {
-        if (!window.ethereum) throw new Error("No wallet extension found. Install MetaMask from metamask.io");
-        w = await connectWallet(window.ethereum);
-      }
+      let raw = window.ethereum;
+      if (id === "okx"      && window.okxwallet)               raw = window.okxwallet;
+      if (id === "coinbase" && window.coinbaseWalletExtension) raw = window.coinbaseWalletExtension;
+      if (!raw) throw new Error("Wallet extension not found or not installed.");
+      const w = await connectWallet(raw);
       setWallet(w);
+      setWalletOpen(false);
     } catch (e) {
       setError(e.code === 4001 ? "Connection cancelled." : e.message);
     } finally {
@@ -237,7 +237,7 @@ export default function DemoPage() {
                     <span style={{ width:6,height:6,borderRadius:"50%",background:"#22A05E",display:"inline-block" }} />
                     {shortAddr(wallet.address)}
                   </span>
-                : <button onClick={connectWalletClick} disabled={connecting}
+                : <button onClick={() => setWalletOpen(true)} disabled={connecting}
                     style={{ display:"flex",alignItems:"center",gap:7,padding:"7px 16px",borderRadius:8,background:AMBER,border:"none",color:INK,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit" }}>
                     {connecting ? <Spinner size={13} /> : null}
                     {connecting ? "Connecting..." : "Connect Wallet"}
@@ -288,7 +288,7 @@ export default function DemoPage() {
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" fill={GREEN.bg} stroke={GREEN.border}/><path d="M5 8l2 2 4-4" stroke={GREEN.text} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       Connected: {shortAddr(wallet.address)}
                     </div>
-                  : <div style={{ flex:1 }}><Btn onClick={() => connectWalletClick("injected")} loading={connecting}>Connect Wallet</Btn></div>
+                  : <div style={{ flex:1 }}><Btn onClick={() => setWalletOpen(true)} loading={connecting}>Connect Wallet</Btn></div>
               )}
               {step > 0 && (
                 <div style={{ display:"flex",alignItems:"center",gap:8,fontSize:14,color:GREEN.text,fontWeight:500 }}>
@@ -449,6 +449,40 @@ export default function DemoPage() {
         </div>
       </div>
       <style>{`@keyframes phspin{to{transform:rotate(360deg)}}`}</style>
+
+      {/* Wallet picker modal */}
+      {walletOpen && (
+        <div onClick={() => setWalletOpen(false)} style={{ position:"fixed",inset:0,zIndex:200,background:"rgba(13,17,23,.52)",backdropFilter:"blur(5px)",display:"flex",alignItems:"center",justifyContent:"center",padding:24 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:"#fff",borderRadius:20,padding:32,width:"100%",maxWidth:400,boxShadow:"0 40px 80px -24px rgba(13,17,23,.35)" }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24 }}>
+              <span style={{ fontSize:20,fontWeight:700,letterSpacing:"-.5px",color:INK }}>Connect a wallet</span>
+              <button onClick={() => setWalletOpen(false)} style={{ width:32,height:32,borderRadius:8,background:"#FAF9F6",border:"none",cursor:"pointer",fontSize:20,color:MUTED,lineHeight:"32px",fontFamily:"inherit" }}>×</button>
+            </div>
+            {error && <div style={{ background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#B91C1C" }}>{error}</div>}
+            <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
+              {[
+                { id:"metamask", label:"MetaMask",       sub:"Browser extension",         bg:"#F97316", letter:"M" },
+                { id:"okx",      label:"OKX Wallet",     sub:"Browser extension",         bg:"#000000", letter:"O" },
+                { id:"coinbase", label:"Coinbase Wallet", sub:"Browser extension",         bg:"#0052FF", letter:"C" },
+                { id:"injected", label:"Brave / Rainbow", sub:"Any other injected wallet", bg:"#6B5CE7", letter:"W" },
+              ].map(({ id, label, sub, bg, letter }) => (
+                <button key={id} onClick={() => connectWalletClick(id)} disabled={connecting}
+                  style={{ display:"flex",alignItems:"center",gap:14,padding:"14px 16px",border:`1px solid ${BORDER}`,borderRadius:12,background:"#fff",cursor:connecting?"wait":"pointer",fontFamily:"inherit",textAlign:"left",width:"100%",transition:"all .15s" }}
+                  onMouseEnter={e => { if (!connecting) { e.currentTarget.style.background="#FAF9F6"; e.currentTarget.style.borderColor=AMBER; }}}
+                  onMouseLeave={e => { e.currentTarget.style.background="#fff"; e.currentTarget.style.borderColor=BORDER; }}>
+                  <div style={{ width:40,height:40,borderRadius:11,background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16,color:"#fff",flexShrink:0 }}>{letter}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:15.5,fontWeight:600,color:INK }}>{label}</div>
+                    <div style={{ fontSize:13,color:"#9AA3AC",marginTop:2 }}>{sub}</div>
+                  </div>
+                  {connecting && <div style={{ width:16,height:16,border:"2px solid "+AMBER,borderTopColor:"transparent",borderRadius:"50%",flexShrink:0,animation:"phspin .6s linear infinite" }} />}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize:12.5,color:"#B0B8C1",textAlign:"center",marginTop:20,lineHeight:1.55 }}>Signs transactions on behalf of the agent on Monad Testnet.</p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
