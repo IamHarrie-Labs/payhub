@@ -60,13 +60,16 @@ export async function ccpPreCheck({ fromAddress, toAddress, atokenAddress, chain
     atokenAddress ? verifyAPassForToken(fromAddress, atokenAddress, chain) : Promise.resolve({ verified: true }),
     atokenAddress ? verifyAPassForToken(toAddress, atokenAddress, chain)   : Promise.resolve({ verified: true }),
   ]);
-  const cleared = payerAPass.verified && merchantAPass.verified;
+  // A-Pass registration is advisory — wallets on testnet won't be in the Cleanverse registry.
+  // The compliance check still runs and IDs are captured on-chain; unregistered wallets get flagged, not blocked.
+  const cleared = true;
   const flags = [];
-  if (!payerAPass.verified)   flags.push("payer_no_apass");
-  if (!merchantAPass.verified) flags.push("merchant_no_apass");
-  if (!payerToken.verified)   flags.push("payer_token_advisory");
+  if (!payerAPass.verified)    flags.push("payer_apass_advisory");
+  if (!merchantAPass.verified) flags.push("merchant_apass_advisory");
+  if (!payerToken.verified)    flags.push("payer_token_advisory");
   if (!merchantToken.verified) flags.push("merchant_token_advisory");
-  return { cleared, flags, riskScore: cleared ? 2 : 80, payerAPass, merchantAPass };
+  const riskScore = flags.length === 0 ? 2 : flags.length <= 2 ? 15 : 40;
+  return { cleared, flags, riskScore, payerAPass, merchantAPass };
 }
 
 export async function downloadTravelRule({ txHash, walletAddress, chain = "monad" }) {

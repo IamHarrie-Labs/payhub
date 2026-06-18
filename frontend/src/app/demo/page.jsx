@@ -118,7 +118,7 @@ export default function DemoPage() {
       if (type === "walletconnect") {
         w = await connectWalletConnect();
       } else {
-        if (!window.ethereum) throw new Error("MetaMask not found. Install from metamask.io");
+        if (!window.ethereum) throw new Error("No wallet extension found. Install MetaMask from metamask.io");
         w = await connectWallet(window.ethereum);
       }
       setWallet(w);
@@ -281,14 +281,14 @@ export default function DemoPage() {
 
             {/* Step 0: Connect */}
             <Card accent={step===0}>
-              <StepHeader n="1" title="Connect Operator Wallet" subtitle="MetaMask on Monad Testnet — signs transactions on behalf of the agent" active={step===0} done={step>0} />
+              <StepHeader n="1" title="Connect Wallet" subtitle="Any Ethereum wallet extension (MetaMask, Coinbase Wallet, Brave, Rainbow…) on Monad Testnet" active={step===0} done={step>0} />
               {step === 0 && (
                 wallet
                   ? <div style={{ display:"flex",alignItems:"center",gap:8,fontSize:14,color:GREEN.text,fontWeight:500 }}>
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" fill={GREEN.bg} stroke={GREEN.border}/><path d="M5 8l2 2 4-4" stroke={GREEN.text} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       Connected: {shortAddr(wallet.address)}
                     </div>
-                  : <div style={{ flex:1 }}><Btn onClick={() => connectWalletClick("injected")} loading={connecting}>Connect MetaMask</Btn></div>
+                  : <div style={{ flex:1 }}><Btn onClick={() => connectWalletClick("injected")} loading={connecting}>Connect Wallet</Btn></div>
               )}
               {step > 0 && (
                 <div style={{ display:"flex",alignItems:"center",gap:8,fontSize:14,color:GREEN.text,fontWeight:500 }}>
