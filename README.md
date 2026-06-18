@@ -4,6 +4,7 @@
 
 Built for the [Cleanverse Verified Finance Hackathon](https://cleanverse.com). PayHub is protocol infrastructure — a dispute, escrow, and compliance layer that any agent payment system can plug into. It is not a consumer app; it is the recourse mechanism that sits underneath one.
 
+[![Live Demo](https://img.shields.io/badge/demo-trypayhub.vercel.app-E8A020?style=flat&logo=vercel&logoColor=black)](https://trypayhub.vercel.app)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/IamHarrie-Labs/payhub&root=frontend)
 
 ---
