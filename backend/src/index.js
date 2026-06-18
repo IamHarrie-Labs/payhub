@@ -26,7 +26,7 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`PayHub API running on http://localhost:${PORT}`);
-  const liveMode = process.env.CLEANVERSE_EMAIL && process.env.CLEANVERSE_PASSWORD;
+  const liveMode = process.env.CLEANVERSE_APP_ID && process.env.CLEANVERSE_API_KEY;
   console.log(`Cleanverse mode: ${liveMode ? "LIVE" : "MOCK"}`);
   console.log(`Chain: ${process.env.MONAD_RPC_URL || "https://testnet-rpc.monad.xyz"}`);
 });

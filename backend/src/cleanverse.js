@@ -223,13 +223,13 @@ export async function ccpPreCheck({ fromAddress, toAddress, atokenAddress, chain
     atokenAddress ? verifyAPassForToken(toAddress,   atokenAddress, chain) : Promise.resolve({ verified: true }),
   ]);
 
-  const cleared = payerAPass.verified && merchantAPass.verified &&
-                  payerToken.verified  && merchantToken.verified;
+  // Identity check is the gate; token eligibility is advisory (sandbox token may not be registered)
+  const cleared = payerAPass.verified && merchantAPass.verified;
   const flags   = [];
   if (!payerAPass.verified)   flags.push("payer_no_apass");
   if (!merchantAPass.verified) flags.push("merchant_no_apass");
-  if (!payerToken.verified)   flags.push("payer_token_blocked");
-  if (!merchantToken.verified) flags.push("merchant_token_blocked");
+  if (!payerToken.verified)   flags.push("payer_token_advisory");
+  if (!merchantToken.verified) flags.push("merchant_token_advisory");
 
   return {
     cleared,

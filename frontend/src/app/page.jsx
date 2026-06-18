@@ -34,8 +34,7 @@ function WalletModal({ onClose, onConnect }) {
   }
 
   const wallets = [
-    { id: "metamask", label: "MetaMask",       sub: "Browser extension", bg: "#F97316", letter: "M" },
-    { id: "coinbase", label: "Coinbase Wallet", sub: "Browser extension", bg: "#0052FF", letter: "C" },
+    { id: "metamask", label: "MetaMask", sub: "Browser extension", bg: "#F97316", letter: "M" },
   ];
 
   return (
@@ -63,7 +62,7 @@ function WalletModal({ onClose, onConnect }) {
             </button>
           ))}
         </div>
-        <p style={{ fontSize:12.5,color:"#B0B8C1",textAlign:"center",marginTop:20,lineHeight:1.55 }}>By connecting you agree to PayHub's Terms of Service.</p>
+        <p style={{ fontSize:12.5,color:"#B0B8C1",textAlign:"center",marginTop:20,lineHeight:1.55 }}>Connect the operator wallet for the PayHub arbiter panel.</p>
       </div>
       <style>{`@keyframes phspin{to{transform:rotate(360deg)}}`}</style>
     </div>
@@ -91,7 +90,7 @@ export default function Home() {
   function onConnected(w) { setWallet(w); setWalletOpen(false); }
   const walletLabel = wallet ? `${wallet.address.slice(0,6)}...${wallet.address.slice(-4)}` : "Connect Wallet";
 
-  const NAV_LINKS = [["Platform","#features"],["How it works","/demo"],["Docs","/demo"]];
+  const NAV_LINKS = [["Protocol","#features"],["How it works","/demo"],["Docs","/docs"]];
 
   const FEATURES = [
     { code:"AP",  title:"A-Pass",     body:"Cryptographic identity for every agent. KYC-backed, on-chain, revocable in one click. Know exactly who is moving money before a single token clears." },
@@ -147,13 +146,13 @@ export default function Home() {
           <div style={{ flex:"1 1 400px",minWidth:280 }}>
             <div className="ph-a ph-d0" style={{ display:"inline-flex",alignItems:"center",gap:8,fontSize:13,fontWeight:700,color:"#C8841A",background:"#FCF4E4",border:"1px solid #F4E3C0",padding:"7px 14px",borderRadius:100,marginBottom:24 }}>
               <span style={{ width:6,height:6,borderRadius:"50%",background:AMBER,display:"inline-block" }} />
-              Payment infrastructure for AI agents
+              Dispute &amp; chargeback rail for AI agent payments
             </div>
             <h1 className="ph-a ph-d1" style={{ fontSize:"clamp(34px,5vw,62px)",lineHeight:1.04,letterSpacing:"-2.2px",fontWeight:700,marginBottom:20 }}>
-              Payments your AI agents can actually make.
+              The recourse layer for AI agent payments.
             </h1>
             <p className="ph-a ph-d2" style={{ fontSize:18,lineHeight:1.65,color:MUTED,maxWidth:480,marginBottom:34 }}>
-              PayHub gives every agent a verifiable identity, programmable spending limits, and built-in regulatory compliance so autonomous payments clear safely, every time.
+              PayHub is protocol infrastructure. Any agent payment system can plug in to get identity-bound disputes, CCP-screened refunds, and regulator-ready audit trails — without rebuilding compliance from scratch.
             </p>
             <div className="ph-a ph-d3" style={{ display:"flex",gap:12,flexWrap:"wrap",alignItems:"center" }}>
               <AmberBtn onClick={() => wallet ? null : setWalletOpen(true)}>{walletLabel}</AmberBtn>
@@ -239,14 +238,16 @@ export default function Home() {
         <section style={{ background:INK,color:"#fff",padding:"88px 24px",textAlign:"center" }}>
           <div style={{ maxWidth:580,margin:"0 auto" }}>
             <div style={{ fontSize:12,fontWeight:700,color:AMBER,marginBottom:18,letterSpacing:".4px",textTransform:"uppercase" }}>Start building</div>
-            <h2 style={{ fontSize:"clamp(26px,4vw,46px)",lineHeight:1.07,letterSpacing:"-1.8px",fontWeight:700,marginBottom:16 }}>The future of agent payments starts here.</h2>
-            <p style={{ fontSize:17,lineHeight:1.65,color:"#8A929C",marginBottom:34 }}>Connect your wallet, explore the demo, and start building on PayHub.</p>
+            <h2 style={{ fontSize:"clamp(26px,4vw,46px)",lineHeight:1.07,letterSpacing:"-1.8px",fontWeight:700,marginBottom:16 }}>Add recourse to your agent payment stack.</h2>
+            <p style={{ fontSize:17,lineHeight:1.65,color:"#8A929C",marginBottom:34 }}>Integrate PayHub's dispute API in one call. See the full compliance flow in the live demo, or read the API reference.</p>
             <div style={{ display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap" }}>
-              <AmberBtn onClick={() => wallet ? null : setWalletOpen(true)}>{walletLabel}</AmberBtn>
-              <Link href="/demo" style={{ display:"inline-flex",alignItems:"center",padding:"13px 24px",borderRadius:10,border:"1px solid #2A323C",color:"#fff",fontWeight:600,fontSize:15,textDecoration:"none",transition:"border-color .2s" }}
+              <Link href="/demo" style={{ display:"inline-flex",alignItems:"center",padding:"13px 24px",borderRadius:10,border:"none",background:AMBER,color:INK,fontWeight:700,fontSize:15,textDecoration:"none" }}>
+                Live demo
+              </Link>
+              <Link href="/docs" style={{ display:"inline-flex",alignItems:"center",padding:"13px 24px",borderRadius:10,border:"1px solid #2A323C",color:"#fff",fontWeight:600,fontSize:15,textDecoration:"none",transition:"border-color .2s" }}
                 onMouseEnter={e => e.currentTarget.style.borderColor="#8A929C"}
                 onMouseLeave={e => e.currentTarget.style.borderColor="#2A323C"}>
-                Live demo
+                API reference
               </Link>
             </div>
           </div>
@@ -260,7 +261,7 @@ export default function Home() {
               <span style={{ width:6,height:6,borderRadius:"50%",background:AMBER,display:"inline-block",marginLeft:3,marginBottom:4,alignSelf:"flex-end" }} />
             </Link>
             <div style={{ display:"flex",gap:22,fontSize:14,color:"#9AA3AC",fontWeight:500 }}>
-              {[["Platform","#features"],["Demo","/demo"],["Dashboard","/dashboard"]].map(([l,h]) => (
+              {[["Protocol","#features"],["Demo","/demo"],["Docs","/docs"],["Dashboard","/dashboard"]].map(([l,h]) => (
                 <a key={l} href={h} style={{ textDecoration:"none",color:"#9AA3AC",transition:"color .2s" }}
                   onMouseEnter={e => e.currentTarget.style.color=INK}
                   onMouseLeave={e => e.currentTarget.style.color="#9AA3AC"}>{l}</a>

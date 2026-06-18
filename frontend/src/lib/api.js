@@ -1,7 +1,7 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
+// Uses relative paths so it works both locally and on Vercel
 async function request(path, opts = {}) {
-  const res  = await fetch(`${BASE}${path}`, {
+  const base = typeof window !== "undefined" ? "" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000");
+  const res  = await fetch(`${base}${path}`, {
     headers: { "Content-Type": "application/json", ...opts.headers },
     ...opts,
   });
@@ -11,12 +11,12 @@ async function request(path, opts = {}) {
 }
 
 export const api = {
-  preflight:        (body)              => request("/payments/preflight", { method: "POST", body: JSON.stringify(body) }),
-  registerPayment:  (body)              => request("/payments/register",  { method: "POST", body: JSON.stringify(body) }),
-  getPayment:       (id)                => request(`/payments/${id}`),
-  disputePreflight: (id, callerAddress) => request(`/payments/${id}/dispute/preflight`, { method: "POST", body: JSON.stringify({ callerAddress }) }),
-  registerDispute:  (id, body)          => request(`/payments/${id}/dispute/register`,  { method: "POST", body: JSON.stringify(body) }),
-  resolve:          (id, body)          => request(`/payments/${id}/resolve`, { method: "POST", body: JSON.stringify(body) }),
-  autoResolve:      (id)                => request(`/payments/${id}/auto-resolve`, { method: "POST", body: JSON.stringify({}) }),
-  getAudit:         (id)                => request(`/payments/${id}/audit`),
+  preflight:        (body)              => request("/api/payments/preflight", { method: "POST", body: JSON.stringify(body) }),
+  registerPayment:  (body)              => request("/api/payments/register",  { method: "POST", body: JSON.stringify(body) }),
+  getPayment:       (id)                => request(`/api/payments/${id}`),
+  disputePreflight: (id, callerAddress) => request(`/api/payments/${id}/dispute/preflight`, { method: "POST", body: JSON.stringify({ callerAddress }) }),
+  registerDispute:  (id, body)          => request(`/api/payments/${id}/dispute/register`,  { method: "POST", body: JSON.stringify(body) }),
+  resolve:          (id, body)          => request(`/api/payments/${id}/resolve`, { method: "POST", body: JSON.stringify(body) }),
+  autoResolve:      (id)                => request(`/api/payments/${id}/auto-resolve`, { method: "POST", body: JSON.stringify({}) }),
+  getAudit:         (id)                => request(`/api/payments/${id}/audit`),
 };

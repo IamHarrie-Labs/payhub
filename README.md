@@ -2,80 +2,214 @@
 
 **Dispute and chargeback rail for AI agent payments on Monad.**
 
-Built for the [Cleanverse Verified Finance Hackathon](https://cleanverse.com). PayHub lets autonomous agents make compliant stablecoin payments with full identity verification, escrow, and dispute resolution — all backed by the Cleanverse compliance stack.
+Built for the [Cleanverse Verified Finance Hackathon](https://cleanverse.com). PayHub is protocol infrastructure — a dispute, escrow, and compliance layer that any agent payment system can plug into. It is not a consumer app; it is the recourse mechanism that sits underneath one.
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/IamHarrie-Labs/payhub&root=frontend)
 
 ---
 
 ## The problem
 
-AI agents can initiate payments. What they can't do is recover from a payment that goes wrong. When an agent pays a merchant and the merchant doesn't deliver, there's no identity-bound recourse: no wallet signature authority to open a chargeback, no compliance trail an auditor could verify, no refund path that a financial regulator would accept.
+AI agents can initiate payments. What they can't do is recover from a payment that goes wrong. When an agent pays a merchant and the merchant doesn't deliver, there's no identity-bound recourse: no compliance trail an auditor could verify, no refund path a financial regulator would accept.
 
-PayHub fixes that. Every payment is escrowed on-chain, both parties are A-Pass verified before a single token moves, and the refund — if it happens — goes back to the original verified payer wallet only.
+PayHub fixes that. Every payment is escrowed on-chain, both parties are A-Pass verified before a single token moves, and any refund is CCP-screened before execution — with a tamper-evident audit bundle at the end.
 
 ---
 
 ## How it works
 
 ```
-Payer (agent)                    PayHub contract              Merchant
-     │                                  │                         │
-     │── POST /payments/preflight ──►  API                        │
-     │   (A-Pass + CCP + Travel Rule)   │                         │
-     │◄── compliance OK ────────────────│                         │
-     │                                  │                         │
-     │── initiatePayment() ────────────►│ ◄── funds held in escrow│
-     │                                  │                         │
-     │         [finality window — 3 days by default]              │
-     │                                  │                         │
-     │── openDispute() ────────────────►│                         │
-     │                                  │── respondToDispute() ──►│
-     │                                  │                         │
-     │     [arbiter reviews evidence]   │                         │
-     │                                  │                         │
-     │◄── refund to original wallet ────│ (CCP-screened refund)   │
-     │                                  │                         │
-     │── GET /payments/:id/audit ──────►│                         │
-     │◄── signed audit bundle ──────────│                         │
+Agent payment system                PayHub                        Monad chain
+        │                              │                               │
+        │── POST /api/payments/preflight ──►                           │
+        │   A-Pass + CCP + Travel Rule check                           │
+        │◄── { cleared: true, apassPayer, apassMerchant } ────────────│
+        │                              │                               │
+        │── initiatePayment() ────────────────────────────────────────►│
+        │                              │         funds held in escrow  │
+        │── POST /api/payments/register ──►                            │
+        │                              │                               │
+        │         [finality window — 3 days default]                   │
+        │                              │                               │
+        │── openDispute() ────────────────────────────────────────────►│
+        │── POST /api/payments/:id/dispute/preflight ──►               │
+        │   (re-verifies payer A-Pass before submitting)               │
+        │── POST /api/payments/:id/dispute/register  ──►               │
+        │                              │                               │
+        │         [arbiter reviews, CCP screens refund]                │
+        │                              │                               │
+        │── POST /api/payments/:id/resolve ──►                         │
+        │                              │── resolveDispute() ──────────►│
+        │◄── { audit } ────────────────│                               │
+        │                              │                               │
+        │── GET /api/payments/:id/audit ──►                            │
+        │◄── signed audit bundle ──────│                               │
 ```
 
-### Payment lifecycle
+---
+
+## Integrating PayHub into your protocol
+
+PayHub exposes a simple REST API. Add dispute resolution to your agent payment system in three steps.
+
+### Step 1 — Run compliance preflight before any on-chain call
+
+```js
+const preflight = await fetch("/api/payments/preflight", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    payerAddress:    agentWallet,       // the paying agent's wallet
+    merchantAddress: merchantWallet,    // the merchant wallet
+    amount:          "50000000",        // in token base units (6 decimals for aUSDC)
+    asset:           ATOKEN_ADDRESS,    // the A-Token contract address
+    orderId:         "your-order-id",
+  }),
+}).then(r => r.json());
+
+if (!preflight.cleared) throw new Error("Compliance check failed");
+
+// preflight.apassPayer    — Cleanverse A-Pass ID for payer   (pass to contract)
+// preflight.apassMerchant — Cleanverse A-Pass ID for merchant (pass to contract)
+// preflight.travelRuleId  — Travel Rule reference
+```
+
+### Step 2 — Call initiatePayment on-chain, then register with the backend
+
+```js
+// On-chain (ethers.js)
+const tx = await payhubContract.initiatePayment(
+  merchantWallet,
+  ATOKEN_ADDRESS,
+  amount,
+  orderId,
+  preflight.apassPayer,    // stored on-chain for audit trail
+  preflight.apassMerchant,
+  0                        // 0 = use default 3-day finality window
+);
+const receipt = await tx.wait();
+
+// Extract paymentId from PaymentInitiated event
+const event = receipt.logs
+  .map(l => { try { return payhubInterface.parseLog(l); } catch { return null; } })
+  .find(e => e?.name === "PaymentInitiated");
+const paymentId = event.args.paymentId;
+
+// Register with backend (attaches Travel Rule + compliance metadata)
+await fetch("/api/payments/register", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    paymentId, orderId, payerAddress, merchantAddress,
+    amount, asset: ATOKEN_ADDRESS,
+    apassPayer:   preflight.apassPayer,
+    apassMerchant: preflight.apassMerchant,
+    travelRuleId: preflight.travelRuleId,
+    txHash:       receipt.hash,
+  }),
+});
+```
+
+### Step 3 — Let your users open disputes
+
+```js
+// Verify identity before submitting the on-chain transaction
+const check = await fetch(`/api/payments/${paymentId}/dispute/preflight`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ callerAddress: userWallet }),
+}).then(r => r.json());
+
+if (!check.eligible) throw new Error(check.error);
+
+// Submit dispute on-chain
+const tx = await payhubContract.openDispute(paymentId, "Goods not delivered");
+await tx.wait();
+
+// Register the dispute
+await fetch(`/api/payments/${paymentId}/dispute/register`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ reason: "Goods not delivered", txHash: tx.hash }),
+});
+```
+
+### Contract ABI (minimum required)
+
+```solidity
+function initiatePayment(
+  address merchant,
+  address token,
+  uint256 amount,
+  string  orderId,
+  string  apassPayer,      // A-Pass ID from preflight response
+  string  apassMerchant,   // A-Pass ID from preflight response
+  uint256 customFinality   // 0 = use 3-day default
+) external returns (bytes32 paymentId)
+
+function openDispute(bytes32 paymentId, string reason) external
+
+function respondToDispute(bytes32 paymentId, string evidence) external
+
+function resolveDispute(bytes32 paymentId, bool inFavorOfPayer, string verdict) external
+
+function autoResolveExpiredDispute(bytes32 paymentId) external
+```
+
+**Deployed contract:** [`0x7BBDa4409e300eaDB0A61F137498480c96173C9e`](https://testnet.monad.xyz/address/0x7BBDa4409e300eaDB0A61F137498480c96173C9e) on Monad Testnet (Chain ID: 10143)
+
+---
+
+## Cleanverse compliance primitives
+
+| Primitive | Where enforced | What it does |
+|-----------|---------------|--------------|
+| **A-Pass** | `preflight` | Both payer and merchant identity verified before payment |
+| **A-Pass** | `dispute/preflight` | Payer identity re-verified at dispute time |
+| **CCP** | `preflight` | Payment leg screened against AML + sanctions |
+| **CCP** | `resolve` | Refund leg screened before execution |
+| **Travel Rule** | Both legs | Originator/beneficiary metadata attached automatically |
+| **A-Token** | Escrow contract | Compliant stablecoin (aUSDC) held in PayHub escrow |
+
+No on-chain transaction is submitted without a backend compliance pre-check. The smart contract stores A-Pass IDs on-chain for a permanent audit trail.
+
+---
+
+## Payment lifecycle
 
 | Status | Description |
 |--------|-------------|
 | `PENDING` | Funds escrowed, finality window active |
-| `SETTLED` | Merchant claimed after window; no dispute possible |
+| `SETTLED` | Merchant claimed after window — no dispute possible |
 | `DISPUTED` | Payer opened dispute before window closed |
-| `REFUNDED` | Arbiter resolved in payer's favour; funds returned to source wallet |
+| `REFUNDED` | Arbiter resolved in payer's favour — funds returned to source wallet |
+
+Default windows (all configurable by contract owner):
+
+| Window | Default |
+|--------|---------|
+| Finality | 3 days |
+| Dispute | 2 days |
+| Merchant response | 24 hours |
+| Platform fee | 0.5% (max 2%) |
 
 ---
 
-## Cleanverse integration
+## API reference
 
-PayHub uses four Cleanverse primitives, each enforced at the right point in the flow:
+Base URL: your deployed Vercel URL or `http://localhost:3000` locally.
 
-| Primitive | Where | What it does |
-|-----------|-------|--------------|
-| **A-Pass** | `POST /payments/preflight` | Verifies both payer and merchant identity before payment |
-| **A-Pass** | `POST /payments/:id/dispute/preflight` | Re-verifies the payer's identity before a dispute is accepted |
-| **CCP** | `POST /payments/preflight` | Screens the payment leg against sanctions and AML |
-| **CCP** | `POST /payments/:id/resolve` | Screens the refund leg before execution |
-| **Travel Rule** | Both preflight calls | Attaches originator/beneficiary metadata to every payment and refund |
-| **A-Token** | Escrow contract | The compliant stablecoin held in PayHub escrow (aUSDC on Monad testnet) |
-
-The backend runs all compliance checks before any on-chain transaction is submitted. The smart contract stores the A-Pass IDs on-chain for audit trail purposes.
-
----
-
-## Tech stack
-
-| Layer | Stack |
-|-------|-------|
-| Smart contract | Solidity 0.8.20 · OpenZeppelin · Hardhat · Monad Testnet |
-| Backend | Node.js (ESM) · Express · Cleanverse Cooperate API v5 |
-| Frontend | Next.js 15 · ethers.js v6 · Tailwind v4 |
-| Wallet | MetaMask · WalletConnect v2 · Coinbase Wallet |
-
-**Deployed contract:** [`0x7BBDa4409e300eaDB0A61F137498480c96173C9e`](https://testnet.monad.xyz/address/0x7BBDa4409e300eaDB0A61F137498480c96173C9e) on Monad Testnet
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/health` | Service health check |
+| `POST` | `/api/payments/preflight` | A-Pass + CCP + Travel Rule pre-check |
+| `POST` | `/api/payments/register` | Store compliance metadata after on-chain tx |
+| `GET`  | `/api/payments/:id` | Fetch payment + on-chain status |
+| `POST` | `/api/payments/:id/dispute/preflight` | Verify payer identity before dispute |
+| `POST` | `/api/payments/:id/dispute/register` | Store dispute metadata |
+| `POST` | `/api/payments/:id/resolve` | Arbiter resolves; CCP screens refund first |
+| `POST` | `/api/payments/:id/auto-resolve` | Auto-refund after merchant misses response window |
+| `GET`  | `/api/payments/:id/audit` | Fetch signed HMAC audit bundle |
 
 ---
 
@@ -85,34 +219,35 @@ The backend runs all compliance checks before any on-chain transaction is submit
 payhub/
 ├── contracts/
 │   ├── contracts/
-│   │   ├── PayHub.sol        # Main escrow + dispute contract
-│   │   └── MockERC20.sol     # Test token
+│   │   ├── PayHub.sol          # Escrow + dispute contract
+│   │   └── MockERC20.sol       # Test token (freely mintable)
 │   ├── scripts/
-│   │   └── deploy.js         # Hardhat deploy script
+│   │   ├── deploy.js           # Deploy PayHub
+│   │   └── deploy_mock.js      # Deploy + mint MockERC20 for demo
 │   ├── test/
-│   │   └── PayHub.test.js    # 7 contract tests
+│   │   └── PayHub.test.js      # 7 contract tests
 │   └── hardhat.config.js
-├── backend/
+├── backend/                    # Standalone Express server (optional — same logic lives in frontend/src/app/api/)
 │   └── src/
-│       ├── index.js          # Express server
-│       ├── cleanverse.js     # Cleanverse API wrapper (A-Pass, CCP, Travel Rule)
-│       ├── chain.js          # ethers.js contract interaction
-│       ├── audit.js          # Signed audit bundle generator
-│       └── routes/
-│           └── payments.js   # All payment routes
-├── frontend/
+│       ├── index.js
+│       ├── cleanverse.js
+│       ├── chain.js
+│       └── audit.js
+├── frontend/                   # Next.js 15 app — deploy this to Vercel
 │   └── src/
 │       ├── app/
-│       │   ├── page.jsx      # Landing page
-│       │   ├── demo/         # Interactive demo flow
-│       │   └── dashboard/    # Payment history + audit downloads
-│       ├── components/       # PaymentCard, ComplianceCheck, AuditReport, StatusBadge
+│       │   ├── page.jsx        # Landing page
+│       │   ├── demo/           # Interactive demo flow
+│       │   ├── docs/           # API reference
+│       │   ├── dashboard/      # Arbiter payment inspector
+│       │   └── api/            # Next.js API routes (backend logic)
+│       │       └── payments/   # All payment + dispute endpoints
 │       └── lib/
-│           ├── wallet.js     # MetaMask / WalletConnect connector
-│           └── api.js        # Backend API client
-├── deployment.json           # Deployed contract addresses
-├── .env.example              # All required env vars, documented
-└── SETUP.md                  # Quick setup guide
+│           ├── server/         # Server-side modules (cleanverse, chain, audit)
+│           ├── wallet.js       # MetaMask connector + contract helpers
+│           └── api.js          # API client (relative URLs)
+├── deployment.json             # Deployed contract addresses
+└── .env.example                # All required env vars
 ```
 
 ---
@@ -122,9 +257,9 @@ payhub/
 ### Prerequisites
 
 - Node.js 18+
-- MetaMask with [Monad Testnet](https://testnet.monad.xyz) configured
-- Monad testnet MON (from the [Monad faucet](https://faucet.monad.xyz))
-- Cleanverse sandbox credentials
+- MetaMask with Monad Testnet configured (Chain ID: 10143)
+- Testnet MON from the [Monad faucet](https://faucet.monad.xyz)
+- Cleanverse sandbox credentials (from [cleanverse.com](https://cleanverse.com))
 
 ### 1. Clone and install
 
@@ -134,231 +269,105 @@ cd payhub
 npm run install:all
 ```
 
-Or install each layer separately:
-
-```bash
-cd contracts && npm install
-cd ../backend  && npm install
-cd ../frontend && npm install
-```
-
 ### 2. Configure environment
 
 ```bash
 cp .env.example .env
-```
-
-Fill in the required values:
-
-```env
-# Cleanverse (from your sandbox credentials)
-CLEANVERSE_API_BASE=https://uatapi.cleanverse.com/api/cooperate
-CLEANVERSE_APP_ID=your_app_id
-CLEANVERSE_API_KEY=your_api_key
-
-# Monad testnet wallets
-DEPLOYER_PRIVATE_KEY=0x...
-ARBITER_PRIVATE_KEY=0x...
-ARBITER_ADDRESS=0x...
-
-# Filled after deploy (step 4)
-PAYHUB_CONTRACT_ADDRESS=0x...
-NEXT_PUBLIC_PAYHUB_CONTRACT=0x...
-```
-
-Copy to backend and frontend:
-
-```bash
+# Fill in your values, then:
 cp .env backend/.env
 cp .env frontend/.env.local
 ```
 
-> **Mock mode:** if `CLEANVERSE_API_KEY` is not set, the backend returns realistic fixture data so the demo runs without a live sandbox key.
+Required values:
 
-### 3. Compile and test the contract
+```env
+CLEANVERSE_API_BASE=https://uatapi.cleanverse.com/api/cooperate
+CLEANVERSE_APP_ID=your_app_id
+CLEANVERSE_API_KEY=your_api_key
+
+MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+DEPLOYER_PRIVATE_KEY=0x...
+ARBITER_PRIVATE_KEY=0x...
+ARBITER_ADDRESS=0x...
+FEE_RECIPIENT=0x...
+
+PAYHUB_CONTRACT_ADDRESS=0x...      # filled after deploy
+NEXT_PUBLIC_PAYHUB_CONTRACT=0x...  # same address
+NEXT_PUBLIC_ATOKEN_ADDRESS=0x...   # A-Token to use (aUSDC or MockERC20)
+
+ARBITER_AUTH_TOKEN=your_secret_token
+AUDIT_SIGNING_SECRET=your_signing_secret
+```
+
+> **Mock mode:** if `CLEANVERSE_APP_ID` or `CLEANVERSE_API_KEY` is not set, the backend returns realistic fixture data so the demo runs without live credentials.
+
+### 3. Deploy a test token (optional — for sandbox without real aUSDC)
+
+```bash
+cd contracts
+npx hardhat run scripts/deploy_mock.js --network monad_testnet
+# Outputs: MOCK_ATOKEN=0x...
+# Set NEXT_PUBLIC_ATOKEN_ADDRESS to that address
+```
+
+### 4. Deploy the contract
 
 ```bash
 cd contracts
 npx hardhat compile
-npx hardhat test
-```
-
-All 7 tests should pass.
-
-### 4. Deploy to Monad Testnet
-
-```bash
-cd contracts
+npx hardhat test           # all 7 tests should pass
 npx hardhat run scripts/deploy.js --network monad_testnet
+# Outputs: PayHub deployed: 0x...
+# Update PAYHUB_CONTRACT_ADDRESS and NEXT_PUBLIC_PAYHUB_CONTRACT in .env
 ```
-
-The script writes `deployment.json` and prints the contract address. Copy it into `.env` as shown in step 2.
 
 ### 5. Run locally
-
-Terminal 1 — backend:
-
-```bash
-cd backend
-npm run dev
-# → http://localhost:3001
-```
-
-Terminal 2 — frontend:
 
 ```bash
 cd frontend
 npm run dev
 # → http://localhost:3000
+# API available at http://localhost:3000/api/*
 ```
+
+The Next.js API routes handle all backend logic — no separate server needed.
 
 ---
 
-## Demo flow
+## Deploy to Vercel
 
-1. Open `http://localhost:3000` and connect MetaMask (Monad Testnet)
-2. Navigate to `/demo`
-3. Enter a merchant wallet address
-4. Click **Run compliance checks** — A-Pass, CCP, and Travel Rule all run in sequence
-5. Click **Pay 50 A-Token** — funds move into escrow on-chain
-6. Click **Open dispute** — backend re-verifies payer identity via A-Pass
-7. Click **Resolve & refund to source** — CCP screens the refund, funds return to original wallet
-8. Click **Download audit bundle** — signed JSON with the full compliance trail
+1. Push this repo to GitHub
+2. Import the repo in [Vercel](https://vercel.com/new)
+3. Set **Root Directory** to `frontend`
+4. Add these environment variables in the Vercel dashboard:
+
+```
+CLEANVERSE_API_BASE
+CLEANVERSE_APP_ID
+CLEANVERSE_API_KEY
+MONAD_RPC_URL
+ARBITER_PRIVATE_KEY
+PAYHUB_CONTRACT_ADDRESS
+NEXT_PUBLIC_PAYHUB_CONTRACT
+NEXT_PUBLIC_ATOKEN_ADDRESS
+NEXT_PUBLIC_ARBITER_TOKEN
+ARBITER_AUTH_TOKEN
+AUDIT_SIGNING_SECRET
+```
+
+5. Deploy — done. Both the frontend and the API run from the same Vercel project.
 
 ---
 
-## Smart contract
-
-**`PayHub.sol`** — [`contracts/contracts/PayHub.sol`](contracts/contracts/PayHub.sol)
-
-### Key functions
-
-```solidity
-// Initiate a payment (payer calls this after backend preflight)
-function initiatePayment(
-    address merchant,
-    address token,
-    uint256 amount,
-    string orderId,
-    string apassPayer,      // A-Pass ID stored on-chain for audit
-    string apassMerchant,
-    uint256 customFinality  // 0 = use 3-day default
-) external returns (bytes32 paymentId)
-
-// Merchant claims settled funds after finality window
-function claimPayment(bytes32 paymentId) external
-
-// Payer opens a dispute (only during dispute window)
-function openDispute(bytes32 paymentId, string reason) external
-
-// Merchant submits evidence (within 24h response window)
-function respondToDispute(bytes32 paymentId, string evidence) external
-
-// Arbiter resolves — inFavorOfPayer=true triggers refund to source
-function resolveDispute(bytes32 paymentId, bool inFavorOfPayer, string verdict) external
-
-// Auto-refund if merchant misses their response window
-function autoResolveExpiredDispute(bytes32 paymentId) external
-```
-
-### Default timings
-
-| Parameter | Default |
-|-----------|---------|
-| Finality window | 3 days |
-| Dispute window | 2 days |
-| Merchant response window | 24 hours |
-| Platform fee | 0.5% (max 2%) |
-
-All configurable by contract owner.
-
----
-
-## Backend API
-
-Base URL: `http://localhost:3001`
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Service health check |
-| `POST` | `/payments/preflight` | A-Pass + CCP + Travel Rule pre-check for both parties |
-| `POST` | `/payments/register` | Store enriched metadata after on-chain `initiatePayment` |
-| `GET` | `/payments/:id` | Fetch payment details + current on-chain status |
-| `POST` | `/payments/:id/dispute/preflight` | Verify caller is the original A-Pass-verified payer |
-| `POST` | `/payments/:id/dispute/register` | Store dispute metadata |
-| `POST` | `/payments/:id/resolve` | Arbiter resolves; CCP-screens refund before execution |
-| `POST` | `/payments/:id/auto-resolve` | Auto-refund after merchant response window expires |
-| `GET` | `/payments/:id/audit` | Fetch signed audit bundle (HMAC-signed JSON) |
-
-### Example: preflight request
-
-```bash
-curl -X POST http://localhost:3001/payments/preflight \
-  -H "Content-Type: application/json" \
-  -d '{
-    "payerAddress": "0xABC...",
-    "merchantAddress": "0xDEF...",
-    "amount": "50",
-    "currency": "AUSDC"
-  }'
-```
-
-### Example: preflight response
-
-```json
-{
-  "approved": true,
-  "apassPayer":    { "cvRecordId": "434", "status": "APPROVED" },
-  "apassMerchant": { "cvRecordId": "435", "status": "APPROVED" },
-  "ccp":           { "status": "CLEARED", "riskScore": 12 },
-  "travelRule":    { "attached": true, "messageId": "TR-0x..." }
-}
-```
-
----
-
-## Audit bundle
-
-Every payment produces a downloadable audit bundle — a signed JSON file containing:
-
-- Payment ID and on-chain transaction hash
-- A-Pass verification records for both parties
-- CCP screening results for payment and refund legs
-- Travel Rule message IDs
-- Dispute timeline (if applicable)
-- HMAC signature for tamper detection
-
-```json
-{
-  "paymentId": "0x...",
-  "txHash": "0x...",
-  "compliance": {
-    "apassPayer":    { "cvRecordId": "434", "verifiedAt": "..." },
-    "apassMerchant": { "cvRecordId": "435", "verifiedAt": "..." },
-    "ccpPayment":    { "status": "CLEARED", "screenedAt": "..." },
-    "ccpRefund":     { "status": "CLEARED", "screenedAt": "..." },
-    "travelRule":    { "messageId": "...", "attachedAt": "..." }
-  },
-  "dispute": { ... },
-  "signature": "sha256=..."
-}
-```
-
----
-
-## Monad Testnet configuration
-
-Add this network to MetaMask manually if it doesn't auto-add:
+## Monad Testnet
 
 | Field | Value |
 |-------|-------|
 | Network name | Monad Testnet |
 | RPC URL | `https://testnet-rpc.monad.xyz` |
 | Chain ID | `10143` |
-| Currency symbol | `MON` |
-| Block explorer | `https://testnet.monad.xyz` |
-
-Get testnet MON from the [Monad faucet](https://faucet.monad.xyz).
+| Currency | MON |
+| Explorer | `https://testnet.monad.xyz` |
 
 ---
 

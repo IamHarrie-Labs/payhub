@@ -112,9 +112,9 @@ export default function DashboardPage() {
 
         <div style={{ maxWidth:760,margin:"0 auto",padding:"48px 24px 80px" }}>
           <div style={{ marginBottom:36 }}>
-            <div style={{ fontSize:12,fontWeight:700,color:"#C8841A",letterSpacing:".4px",textTransform:"uppercase",marginBottom:10 }}>Dashboard</div>
-            <h1 style={{ fontSize:"clamp(24px,3.5vw,36px)",letterSpacing:"-1.2px",fontWeight:700,marginBottom:8 }}>Payment lookup</h1>
-            <p style={{ fontSize:15,color:MUTED }}>Enter a payment ID to inspect its lifecycle, dispute status, and audit bundle.</p>
+            <div style={{ fontSize:12,fontWeight:700,color:"#C8841A",letterSpacing:".4px",textTransform:"uppercase",marginBottom:10 }}>Arbiter Panel</div>
+            <h1 style={{ fontSize:"clamp(24px,3.5vw,36px)",letterSpacing:"-1.2px",fontWeight:700,marginBottom:8 }}>Payment inspector</h1>
+            <p style={{ fontSize:15,color:MUTED }}>Look up any payment by ID to inspect its compliance trail, dispute status, and signed audit bundle.</p>
           </div>
 
           {/* Lookup */}
@@ -162,11 +162,9 @@ export default function DashboardPage() {
                   ))}
                 </div>
                 {status === "DISPUTED" && (
-                  <button onClick={triggerAutoResolve} disabled={fetching}
-                    style={{ width:"100%",padding:"11px",borderRadius:10,background:RED.bg,border:`1px solid ${RED.border}`,color:RED.text,fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
-                    {fetching && <Spinner size={13} />}
-                    Trigger auto-resolve (merchant missed response window)
-                  </button>
+                  <div style={{ padding:"10px 14px",borderRadius:10,background:RED.bg,border:`1px solid ${RED.border}`,fontSize:13,color:RED.text }}>
+                    Dispute open — merchant has 24h to respond. Auto-resolve available after the response window expires.
+                  </div>
                 )}
               </div>
 

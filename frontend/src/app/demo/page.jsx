@@ -252,11 +252,11 @@ export default function DemoPage() {
           {/* Header */}
           <div style={{ textAlign:"center",marginBottom:48 }}>
             <div style={{ display:"inline-flex",alignItems:"center",gap:7,fontSize:12,fontWeight:700,color:"#C8841A",background:"#FCF4E4",border:"1px solid #F4E3C0",padding:"6px 14px",borderRadius:100,marginBottom:16,letterSpacing:".3px",textTransform:"uppercase" }}>
-              Live Demo
+              Protocol Demo
             </div>
-            <h1 style={{ fontSize:"clamp(28px,4vw,42px)",letterSpacing:"-1.5px",fontWeight:700,marginBottom:12 }}>The payment that goes wrong</h1>
+            <h1 style={{ fontSize:"clamp(28px,4vw,42px)",letterSpacing:"-1.5px",fontWeight:700,marginBottom:12 }}>An agent payment — and its chargeback</h1>
             <p style={{ fontSize:16.5,color:MUTED,lineHeight:1.65,maxWidth:520,margin:"0 auto" }}>
-              Watch PayHub handle a chargeback end-to-end: verified identity, real compliance checks, on-chain dispute, and a refund back to source.
+              This is what a PayHub integration looks like end-to-end: A-Pass identity checks, CCP screening, on-chain escrow, dispute, and a refund that goes back to the original verified payer — no human needed.
             </p>
           </div>
 
@@ -281,17 +281,14 @@ export default function DemoPage() {
 
             {/* Step 0: Connect */}
             <Card accent={step===0}>
-              <StepHeader n="1" title="Connect Wallet" subtitle="MetaMask on Monad Testnet" active={step===0} done={step>0} />
+              <StepHeader n="1" title="Connect Operator Wallet" subtitle="MetaMask on Monad Testnet — signs transactions on behalf of the agent" active={step===0} done={step>0} />
               {step === 0 && (
                 wallet
                   ? <div style={{ display:"flex",alignItems:"center",gap:8,fontSize:14,color:GREEN.text,fontWeight:500 }}>
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" fill={GREEN.bg} stroke={GREEN.border}/><path d="M5 8l2 2 4-4" stroke={GREEN.text} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       Connected: {shortAddr(wallet.address)}
                     </div>
-                  : <div style={{ display:"flex",gap:10,flexWrap:"wrap" }}>
-                      <div style={{ flex:1 }}><Btn onClick={() => connectWalletClick("injected")} loading={connecting}>MetaMask</Btn></div>
-                      <div style={{ flex:1 }}><Btn onClick={() => connectWalletClick("walletconnect")} loading={connecting} variant="ghost">WalletConnect</Btn></div>
-                    </div>
+                  : <div style={{ flex:1 }}><Btn onClick={() => connectWalletClick("injected")} loading={connecting}>Connect MetaMask</Btn></div>
               )}
               {step > 0 && (
                 <div style={{ display:"flex",alignItems:"center",gap:8,fontSize:14,color:GREEN.text,fontWeight:500 }}>
@@ -365,10 +362,7 @@ export default function DemoPage() {
                     </div>
                     <div style={{ marginBottom:16 }}>
                       <label style={{ display:"block",fontSize:13,fontWeight:600,color:INK,marginBottom:6 }}>Dispute reason</label>
-                      <textarea value={disputeReason} onChange={e => setDisputeReason(e.target.value)} rows={2}
-                        style={{ width:"100%",padding:"11px 14px",border:`1px solid ${BORDER}`,borderRadius:10,fontSize:14,fontFamily:"'Space Grotesk',sans-serif",color:INK,resize:"none",outline:"none",boxSizing:"border-box" }}
-                        onFocus={e => e.currentTarget.style.borderColor=RED.border}
-                        onBlur={e => e.currentTarget.style.borderColor=BORDER} />
+                      <div style={{ width:"100%",padding:"11px 14px",border:`1px solid ${BORDER}`,borderRadius:10,fontSize:14,color:MUTED,background:CREAM,boxSizing:"border-box" }}>{disputeReason}</div>
                     </div>
                     <Btn onClick={openDispute} loading={busy} variant="danger">Open Dispute</Btn>
                   </>
