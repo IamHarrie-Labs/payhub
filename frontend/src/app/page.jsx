@@ -17,15 +17,11 @@ function WalletModal({ onClose, onConnect }) {
   async function connect(id) {
     setBusy(id); setErr(null);
     try {
-      let w;
-      if (id === "walletconnect") {
-        w = await connectWalletConnect();
-      } else {
-        let raw = window.ethereum;
-        if (id === "coinbase" && window.coinbaseWalletExtension) raw = window.coinbaseWalletExtension;
-        if (!raw) throw new Error("Wallet not found. Install MetaMask from metamask.io");
-        w = await connectWallet(raw);
-      }
+      let raw = window.ethereum;
+      if (id === "coinbase" && window.coinbaseWalletExtension) raw = window.coinbaseWalletExtension;
+      if (id === "okx"      && window.okxwallet)               raw = window.okxwallet;
+      if (!raw) throw new Error("Wallet extension not found or not installed.");
+      const w = await connectWallet(raw);
       onConnect(w);
     } catch (e) {
       setErr(e.code === 4001 ? "Connection cancelled." : e.message);
@@ -35,6 +31,7 @@ function WalletModal({ onClose, onConnect }) {
 
   const wallets = [
     { id: "metamask", label: "MetaMask",       sub: "Browser extension",         bg: "#F97316", letter: "M" },
+    { id: "okx",      label: "OKX Wallet",     sub: "Browser extension",         bg: "#000000", letter: "O" },
     { id: "coinbase", label: "Coinbase Wallet", sub: "Browser extension",         bg: "#0052FF", letter: "C" },
     { id: "injected", label: "Brave / Rainbow", sub: "Any other injected wallet", bg: "#6B5CE7", letter: "W" },
   ];
