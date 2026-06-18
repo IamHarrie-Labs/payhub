@@ -358,10 +358,10 @@ export default function DemoPage() {
                 {step === 2 && (
                   <>
                     <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18 }}>
-                      {[["Order",DEMO_ORDER_ID.slice(0,22)+"..."],["Amount","50 A-Token"],["Finality window","3 days"],["Dispute window","2 days"]].map(([k,v]) => (
+                      {[["Order",DEMO_ORDER_ID.slice(0,22)+"..."],["Amount","50 A-Token"],["Token",TOKEN_ADDR.slice(0,10)+"..."],["Contract",(process.env.NEXT_PUBLIC_PAYHUB_CONTRACT||"NOT SET").slice(0,10)+"..."]].map(([k,v]) => (
                         <div key={k} style={{ background:CREAM,borderRadius:10,padding:"10px 14px" }}>
                           <div style={{ fontSize:12,color:MUTED,fontWeight:500,marginBottom:3 }}>{k}</div>
-                          <div style={{ fontSize:13.5,fontWeight:600,color:INK,wordBreak:"break-all" }}>{v}</div>
+                          <div style={{ fontSize:13.5,fontWeight:600,color:v.includes("NOT SET")?RED.text:INK,wordBreak:"break-all" }}>{v}</div>
                         </div>
                       ))}
                     </div>
