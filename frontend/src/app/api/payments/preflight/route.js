@@ -22,11 +22,11 @@ export async function POST(request) {
 
     return Response.json({
       cleared:       true,
-      apassPayer:    payerPass.apassId    ?? `cv_${payerAddress.slice(2, 10)}`,
-      apassMerchant: merchantPass.apassId ?? `cv_${merchantAddress.slice(2, 10)}`,
+      apassPayer:    payerPass.apassId    || payerAddress.toLowerCase(),
+      apassMerchant: merchantPass.apassId || merchantAddress.toLowerCase(),
       ccpRiskScore:  ccp.riskScore,
-      payerTier:     payerPass.tier ?? "unregistered",
-      merchantTier:  merchantPass.tier ?? "unregistered",
+      payerTier:     payerPass.tier    || "testnet",
+      merchantTier:  merchantPass.tier || "testnet",
       flags:         [...apassFlags, ...ccp.flags],
       travelRuleId:  `tr_pre_${crypto.randomUUID()}`,
     });

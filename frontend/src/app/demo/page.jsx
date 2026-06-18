@@ -166,48 +166,54 @@ export default function DemoPage() {
   async function pay() {
     if (!wallet) return;
     setBusy(true); setError(null); setPayStatus(null);
+    const PAYHUB = "0x7BBDa4409e300eaDB0A61F137498480c96173C9e";
+    const ERC20_ABI = [
+      "function allowance(address,address) view returns (uint256)",
+      "function approve(address,uint256) returns (bool)",
+      "function balanceOf(address) view returns (uint256)",
+    ];
     try {
-      setPayStatus("Checking token allowance…");
-      const { ethers: eth } = await import("ethers");
-      const ERC20 = ["function allowance(address,address) view returns (uint256)", "function approve(address,uint256) returns (bool)", "function balanceOf(address) view returns (uint256)"];
-      const token = new eth.Contract(TOKEN_ADDR, ERC20, wallet.signer);
-      const payhubAddr = process.env.NEXT_PUBLIC_PAYHUB_CONTRACT;
-      if (!payhubAddr) throw new Error("NEXT_PUBLIC_PAYHUB_CONTRACT env var not set — check Vercel environment variables.");
+      setPayStatus("Checking token balance and allowance…");
+      const token = new ethers.Contract(TOKEN_ADDR, ERC20_ABI, wallet.signer);
       const [bal, allowance] = await Promise.all([
         token.balanceOf(wallet.address),
-        token.allowance(wallet.address, payhubAddr),
+        token.allowance(wallet.address, PAYHUB),
       ]);
-      if (bal < DEMO_AMOUNT) throw new Error(`Insufficient token balance. You have ${eth.formatUnits(bal, 6)} A-Token but need 50. Mint more MockERC20 tokens first.`);
+      if (bal < DEMO_AMOUNT)
+        throw new Error(`Insufficient balance: you have ${ethers.formatUnits(bal, 6)} A-Token, need 50.`);
       if (allowance < DEMO_AMOUNT) {
-        setPayStatus("Approving token spend — confirm in your wallet…");
-        const approveTx = await token.approve(payhubAddr, DEMO_AMOUNT);
+        setPayStatus("Step 1/2 — Approve token spend. Confirm in your wallet…");
+        const approveTx = await token.approve(PAYHUB, DEMO_AMOUNT);
+        setPayStatus("Waiting for approval to confirm on chain…");
         await approveTx.wait();
       }
-      setPayStatus("Sending payment — confirm in your wallet…");
-      const { txHash, paymentId: pid } = await initiatePayment(wallet.signer, {
-        merchant:      merchantAddr,
-        token:         TOKEN_ADDR,
-        amount:        DEMO_AMOUNT,
-        orderId:       DEMO_ORDER_ID,
-        apassPayer:    preflight.apassPayer,
-        apassMerchant: preflight.apassMerchant,
-      });
-      setPayStatus("Registering payment…");
+      setPayStatus("Step 2/2 — Sending payment. Confirm in your wallet…");
+      const payhubContract = new ethers.Contract(PAYHUB, [
+        "function initiatePayment(address,address,uint256,string,string,string,uint256) external returns (bytes32)",
+        "event PaymentInitiated(bytes32 indexed,address indexed,address indexed,address,uint256,string,uint256)",
+      ], wallet.signer);
+      const tx  = await payhubContract.initiatePayment(
+        merchantAddr, TOKEN_ADDR, DEMO_AMOUNT, DEMO_ORDER_ID,
+        preflight.apassPayer, preflight.apassMerchant, 0
+      );
+      setPayStatus("Waiting for payment tx to confirm…");
+      const rec = await tx.wait();
+      const iface = payhubContract.interface;
+      const event = rec.logs
+        .map(l => { try { return iface.parseLog(l); } catch { return null; } })
+        .find(e => e?.name === "PaymentInitiated");
+      const pid = event?.args?.paymentId;
+      setPayStatus("Registering with compliance backend…");
       await api.registerPayment({
-        paymentId:       pid,
-        orderId:         DEMO_ORDER_ID,
-        payerAddress:    wallet.address,
-        merchantAddress: merchantAddr,
-        amount:          DEMO_AMOUNT.toString(),
-        asset:           TOKEN_ADDR,
-        apassPayer:      preflight.apassPayer,
-        apassMerchant:   preflight.apassMerchant,
-        travelRuleId:    preflight.travelRuleId,
-        txHash,
+        paymentId: pid, orderId: DEMO_ORDER_ID,
+        payerAddress: wallet.address, merchantAddress: merchantAddr,
+        amount: DEMO_AMOUNT.toString(), asset: TOKEN_ADDR,
+        apassPayer: preflight.apassPayer, apassMerchant: preflight.apassMerchant,
+        travelRuleId: preflight.travelRuleId, txHash: rec.hash,
       });
-      setPaymentId(pid); setPayTx(txHash); setStep(3);
+      setPaymentId(pid); setPayTx(rec.hash); setStep(3);
     } catch (e) {
-      err(e.reason || e.shortMessage || e.message || "Payment failed — check console for details.");
+      err(e.reason || e.shortMessage || e.message || "Payment failed.");
     } finally { setBusy(false); setPayStatus(null); }
   }
 

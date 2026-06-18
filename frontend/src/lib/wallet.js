@@ -75,10 +75,10 @@ export async function connectWalletConnect() {
 }
 
 // ─── Contract helpers ─────────────────────────────────────────────────────────
+const PAYHUB_ADDR = process.env.NEXT_PUBLIC_PAYHUB_CONTRACT || "0x7BBDa4409e300eaDB0A61F137498480c96173C9e";
+
 export function getPayHubContract(signer) {
-  const addr = process.env.NEXT_PUBLIC_PAYHUB_CONTRACT;
-  if (!addr) throw new Error("NEXT_PUBLIC_PAYHUB_CONTRACT not set");
-  return new ethers.Contract(addr, PAYHUB_ABI, signer);
+  return new ethers.Contract(PAYHUB_ADDR, PAYHUB_ABI, signer);
 }
 
 export function getTokenContract(signer, tokenAddress) {
