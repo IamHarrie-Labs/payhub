@@ -188,21 +188,24 @@ export default function DemoPage() {
         await approveTx.wait();
       }
       setPayStatus("Step 2/2 — Sending payment. Confirm in your wallet…");
-      const payhubContract = new ethers.Contract(PAYHUB, [
-        "function initiatePayment(address,address,uint256,string,string,string,uint256) external returns (bytes32)",
-        "event PaymentInitiated(bytes32 indexed,address indexed,address indexed,address,uint256,string,uint256)",
-      ], wallet.signer);
+      const PAYHUB_ABI = [
+        "function initiatePayment(address merchant, address token, uint256 amount, string orderId, string apassPayer, string apassMerchant, uint256 customFinality) external returns (bytes32)",
+        "event PaymentInitiated(bytes32 indexed paymentId, address indexed payer, address indexed merchant, address token, uint256 amount, string orderId, uint256 finalityDeadline)",
+      ];
+      const payhubContract = new ethers.Contract(PAYHUB, PAYHUB_ABI, wallet.signer);
       const tx  = await payhubContract.initiatePayment(
         merchantAddr, TOKEN_ADDR, DEMO_AMOUNT, DEMO_ORDER_ID,
         preflight.apassPayer, preflight.apassMerchant, 0
       );
       setPayStatus("Waiting for payment tx to confirm…");
       const rec = await tx.wait();
+      // Try ABI parsing first; fall back to reading paymentId from topic[1]
       const iface = payhubContract.interface;
-      const event = rec.logs
+      const parsedLog = rec.logs
         .map(l => { try { return iface.parseLog(l); } catch { return null; } })
         .find(e => e?.name === "PaymentInitiated");
-      const pid = event?.args?.paymentId;
+      const pid = parsedLog?.args?.paymentId ?? rec.logs?.[0]?.topics?.[1];
+      if (!pid) throw new Error("Could not extract paymentId from transaction receipt. Check the Monad explorer for tx: " + rec.hash);
       setPayStatus("Registering with compliance backend…");
       await api.registerPayment({
         paymentId: pid, orderId: DEMO_ORDER_ID,
