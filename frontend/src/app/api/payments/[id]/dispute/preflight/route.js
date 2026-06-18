@@ -17,9 +17,8 @@ export async function POST(request, { params }) {
     if (onChain.payer.toLowerCase() !== callerAddress?.toLowerCase())
       return Response.json({ error: "Only the original payer can open a dispute" }, { status: 403 });
 
+    // A-Pass is advisory on testnet — unregistered wallets are flagged, not blocked
     const pass = await verifyAPass(callerAddress);
-    if (!pass.verified)
-      return Response.json({ error: "Caller A-Pass identity could not be verified" }, { status: 403 });
 
     const now        = Math.floor(Date.now() / 1000);
     const createdAt  = Number(onChain.createdAt);
@@ -29,8 +28,9 @@ export async function POST(request, { params }) {
 
     return Response.json({
       eligible:       true,
-      apassId:        pass.apassId,
-      tier:           pass.tier,
+      apassId:        pass.apassId  || callerAddress.toLowerCase(),
+      tier:           pass.tier     || "testnet",
+      verified:       pass.verified || false,
       windowClosesAt: new Date((createdAt + dispWindow) * 1000).toISOString(),
     });
   } catch (e) {

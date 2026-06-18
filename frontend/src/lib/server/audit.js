@@ -28,7 +28,7 @@ export function buildAuditBundle({
     },
     dispute: dispute ? {
       reason:            dispute.reason,
-      openedAt:          dispute.openedAt,
+      openedAt:          dispute.openedAt ? new Date(Number(dispute.openedAt) * 1000).toISOString() : null,
       merchantResponded: dispute.merchantResponded ?? false,
       merchantEvidence:  dispute.merchantEvidence  || null,
     } : null,

@@ -17,7 +17,7 @@ export async function POST(request, { params }) {
     let ccpRefund = null;
     if (inFavorOfPayer) {
       ccpRefund = await ccpPreCheck({
-        fromAddress:   process.env.PAYHUB_CONTRACT_ADDRESS || "0x",
+        fromAddress:   onChain.merchant,
         toAddress:     onChain.payer,
         atokenAddress: onChain.token,
       });
@@ -34,6 +34,7 @@ export async function POST(request, { params }) {
       trReport = await downloadTravelRule({ txHash: meta.txHash, walletAddress: onChain.payer });
     }
 
+    const disputeData = dispute || store.disputes[id] || null;
     const audit = buildAuditBundle({
       paymentId:     id,
       orderId:       meta.orderId      || onChain.orderId,
@@ -41,11 +42,15 @@ export async function POST(request, { params }) {
       merchant:      onChain.merchant,
       apassPayer:    onChain.apassPayer,
       apassMerchant: onChain.apassMerchant,
-      amount:        onChain.amount,
+      amount:        onChain.amount?.toString()    ?? onChain.amount,
       token:         onChain.token,
       status:        inFavorOfPayer ? "REFUNDED" : "SETTLED",
-      createdAt:     onChain.createdAt,
-      dispute:       dispute || store.disputes[id] || null,
+      createdAt:     onChain.createdAt?.toString() ?? onChain.createdAt,
+      dispute:       disputeData ? {
+        ...disputeData,
+        openedAt:         disputeData.openedAt?.toString()         ?? disputeData.openedAt,
+        responseDeadline: disputeData.responseDeadline?.toString() ?? disputeData.responseDeadline,
+      } : null,
       ccpResults:    { refund: ccpRefund },
       travelRule:    { id: meta.travelRuleId, reportUrl: trReport?.downloadUrl },
       resolution:    { verdict, inFavorOfPayer, txHash: result.txHash, resolvedAt: new Date().toISOString() },
