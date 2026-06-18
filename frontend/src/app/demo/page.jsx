@@ -98,6 +98,7 @@ export default function DemoPage() {
   const [walletOpen,   setWalletOpen]   = useState(false);
   const [step,         setStep]         = useState(0);
   const [busy,         setBusy]         = useState(false);
+  const [payStatus,    setPayStatus]    = useState(null);
   const [error,        setError]        = useState(null);
   const [merchantAddr, setMerchantAddr] = useState("");
   const [checks,       setChecks]       = useState([]);
@@ -164,8 +165,25 @@ export default function DemoPage() {
 
   async function pay() {
     if (!wallet) return;
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setPayStatus(null);
     try {
+      setPayStatus("Checking token allowance…");
+      const { ethers: eth } = await import("ethers");
+      const ERC20 = ["function allowance(address,address) view returns (uint256)", "function approve(address,uint256) returns (bool)", "function balanceOf(address) view returns (uint256)"];
+      const token = new eth.Contract(TOKEN_ADDR, ERC20, wallet.signer);
+      const payhubAddr = process.env.NEXT_PUBLIC_PAYHUB_CONTRACT;
+      if (!payhubAddr) throw new Error("NEXT_PUBLIC_PAYHUB_CONTRACT env var not set — check Vercel environment variables.");
+      const [bal, allowance] = await Promise.all([
+        token.balanceOf(wallet.address),
+        token.allowance(wallet.address, payhubAddr),
+      ]);
+      if (bal < DEMO_AMOUNT) throw new Error(`Insufficient token balance. You have ${eth.formatUnits(bal, 6)} A-Token but need 50. Mint more MockERC20 tokens first.`);
+      if (allowance < DEMO_AMOUNT) {
+        setPayStatus("Approving token spend — confirm in your wallet…");
+        const approveTx = await token.approve(payhubAddr, DEMO_AMOUNT);
+        await approveTx.wait();
+      }
+      setPayStatus("Sending payment — confirm in your wallet…");
       const { txHash, paymentId: pid } = await initiatePayment(wallet.signer, {
         merchant:      merchantAddr,
         token:         TOKEN_ADDR,
@@ -174,6 +192,7 @@ export default function DemoPage() {
         apassPayer:    preflight.apassPayer,
         apassMerchant: preflight.apassMerchant,
       });
+      setPayStatus("Registering payment…");
       await api.registerPayment({
         paymentId:       pid,
         orderId:         DEMO_ORDER_ID,
@@ -187,7 +206,9 @@ export default function DemoPage() {
         txHash,
       });
       setPaymentId(pid); setPayTx(txHash); setStep(3);
-    } catch (e) { err(e.message); } finally { setBusy(false); }
+    } catch (e) {
+      err(e.reason || e.shortMessage || e.message || "Payment failed — check console for details.");
+    } finally { setBusy(false); setPayStatus(null); }
   }
 
   async function openDispute() {
@@ -345,6 +366,7 @@ export default function DemoPage() {
                       ))}
                     </div>
                     <Btn onClick={pay} loading={busy}>Pay 50 A-Token</Btn>
+                    {payStatus && <div style={{ marginTop:10,fontSize:13,color:MUTED,textAlign:"center" }}>{payStatus}</div>}
                   </>
                 )}
                 {payTx && (
