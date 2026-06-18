@@ -54,11 +54,12 @@ export async function connectWallet(rawProvider) {
   const raw = rawProvider ?? window.ethereum;
   if (!raw) throw new Error("No wallet detected. Install MetaMask from metamask.io");
 
-  // Explicitly triggers the wallet popup
   await raw.request({ method: "eth_requestAccounts" });
   await ensureMonadChain(raw);
 
-  const provider = new ethers.BrowserProvider(raw);
+  // Pass network explicitly so ethers never attempts ENS resolution on Monad testnet
+  const monadNetwork = new ethers.Network("Monad Testnet", CHAIN_ID);
+  const provider = new ethers.BrowserProvider(raw, monadNetwork);
   const signer   = await provider.getSigner();
   const address  = await signer.getAddress();
   return { provider, signer, address, rawProvider: raw, walletType: "injected" };
