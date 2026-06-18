@@ -199,13 +199,15 @@ export default function DemoPage() {
       );
       setPayStatus("Waiting for payment tx to confirm…");
       const rec = await tx.wait();
-      // Try ABI parsing first; fall back to reading paymentId from topic[1]
+      // Parse PaymentInitiated event — scan all logs, not just index 0
       const iface = payhubContract.interface;
+      const INITIATED_TOPIC = ethers.id("PaymentInitiated(bytes32,address,address,address,uint256,string,uint256)");
       const parsedLog = rec.logs
         .map(l => { try { return iface.parseLog(l); } catch { return null; } })
         .find(e => e?.name === "PaymentInitiated");
-      const pid = parsedLog?.args?.paymentId ?? rec.logs?.[0]?.topics?.[1];
-      if (!pid) throw new Error("Could not extract paymentId from transaction receipt. Check the Monad explorer for tx: " + rec.hash);
+      const initiatedLog = rec.logs.find(l => l.topics?.[0] === INITIATED_TOPIC);
+      const pid = parsedLog?.args?.paymentId ?? initiatedLog?.topics?.[1];
+      if (!pid) throw new Error("Could not extract paymentId from receipt (tx: " + rec.hash + ")");
       setPayStatus("Registering with compliance backend…");
       await api.registerPayment({
         paymentId: pid, orderId: DEMO_ORDER_ID,
@@ -222,13 +224,25 @@ export default function DemoPage() {
 
   async function openDispute() {
     if (!wallet || !paymentId) return;
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setPayStatus(null);
+    const DISPUTE_ABI = [
+      "function openDispute(bytes32 paymentId, string reason) external",
+      "event DisputeOpened(bytes32 indexed paymentId, address indexed payer, string reason, uint256 responseDeadline)",
+    ];
     try {
+      setPayStatus("Verifying payer identity…");
       await api.disputePreflight(paymentId, wallet.address);
-      const { txHash } = await openDisputeOnChain(wallet.signer, paymentId, disputeReason);
-      await api.registerDispute(paymentId, { reason: disputeReason, txHash });
-      setDisputeTx(txHash); setStep(4);
-    } catch (e) { err(e.message); } finally { setBusy(false); }
+      setPayStatus("Opening dispute — confirm in your wallet…");
+      const disputeContract = new ethers.Contract(PAYHUB, DISPUTE_ABI, wallet.signer);
+      const tx  = await disputeContract.openDispute(paymentId, disputeReason);
+      setPayStatus("Waiting for dispute tx to confirm…");
+      const rec = await tx.wait();
+      setPayStatus("Registering dispute…");
+      await api.registerDispute(paymentId, { reason: disputeReason, txHash: rec.hash });
+      setDisputeTx(rec.hash); setStep(4);
+    } catch (e) {
+      err(e.reason || e.shortMessage || e.message || "Dispute failed.");
+    } finally { setBusy(false); setPayStatus(null); }
   }
 
   async function resolve() {
@@ -398,6 +412,7 @@ export default function DemoPage() {
                       <div style={{ width:"100%",padding:"11px 14px",border:`1px solid ${BORDER}`,borderRadius:10,fontSize:14,color:MUTED,background:CREAM,boxSizing:"border-box" }}>{disputeReason}</div>
                     </div>
                     <Btn onClick={openDispute} loading={busy} variant="danger">Open Dispute</Btn>
+                    {payStatus && <div style={{ marginTop:10,fontSize:13,color:MUTED,textAlign:"center" }}>{payStatus}</div>}
                   </>
                 )}
                 {disputeTx && (
