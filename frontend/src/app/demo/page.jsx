@@ -16,7 +16,7 @@ const RED    = { text:"#B91C1C", bg:"#FEF2F2", border:"#FECACA" };
 
 const DEMO_ORDER_ID  = `demo_${Date.now()}`;
 const DEMO_AMOUNT    = ethers.parseUnits("50", 6);
-const TOKEN_ADDR     = process.env.NEXT_PUBLIC_ATOKEN_ADDRESS || "0x4fE3D834032E022049a1c904016C02f95A4f94A9";
+const TOKEN_ADDR     = "0x4fE3D834032E022049a1c904016C02f95A4f94A9"; // MockERC20 on Monad testnet
 
 // ─── Shared atoms ─────────────────────────────────────────────────────────────
 function Btn({ onClick, disabled, loading, children, variant = "primary" }) {
