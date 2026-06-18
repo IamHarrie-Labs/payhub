@@ -16,7 +16,8 @@ const RED    = { text:"#B91C1C", bg:"#FEF2F2", border:"#FECACA" };
 
 const DEMO_ORDER_ID  = `demo_${Date.now()}`;
 const DEMO_AMOUNT    = ethers.parseUnits("50", 6);
-const TOKEN_ADDR     = "0x4fE3D834032E022049a1c904016C02f95A4f94A9"; // MockERC20 on Monad testnet
+const TOKEN_ADDR = "0x4fE3D834032E022049a1c904016C02f95A4f94A9";
+const PAYHUB     = "0x7BBDa4409e300eaDB0A61F137498480c96173C9e";
 
 // ─── Shared atoms ─────────────────────────────────────────────────────────────
 function Btn({ onClick, disabled, loading, children, variant = "primary" }) {
@@ -166,7 +167,6 @@ export default function DemoPage() {
   async function pay() {
     if (!wallet) return;
     setBusy(true); setError(null); setPayStatus(null);
-    const PAYHUB = "0x7BBDa4409e300eaDB0A61F137498480c96173C9e";
     const ERC20_ABI = [
       "function allowance(address,address) view returns (uint256)",
       "function approve(address,uint256) returns (bool)",
