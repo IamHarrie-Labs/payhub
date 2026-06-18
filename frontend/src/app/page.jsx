@@ -34,7 +34,9 @@ function WalletModal({ onClose, onConnect }) {
   }
 
   const wallets = [
-    { id: "metamask", label: "MetaMask", sub: "Browser extension", bg: "#F97316", letter: "M" },
+    { id: "metamask", label: "MetaMask",       sub: "Browser extension",         bg: "#F97316", letter: "M" },
+    { id: "coinbase", label: "Coinbase Wallet", sub: "Browser extension",         bg: "#0052FF", letter: "C" },
+    { id: "injected", label: "Brave / Rainbow", sub: "Any other injected wallet", bg: "#6B5CE7", letter: "W" },
   ];
 
   return (
