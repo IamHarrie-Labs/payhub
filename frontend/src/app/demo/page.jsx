@@ -16,7 +16,7 @@ const RED    = { text:"#B91C1C", bg:"#FEF2F2", border:"#FECACA" };
 
 const DEMO_ORDER_ID  = `demo_${Date.now()}`;
 const DEMO_AMOUNT    = ethers.parseUnits("50", 6);
-const TOKEN_ADDR     = process.env.NEXT_PUBLIC_ATOKEN_ADDRESS || "0xaC0893567D43C3E7e6e35a72803df05416C1f20D";
+const TOKEN_ADDR     = process.env.NEXT_PUBLIC_ATOKEN_ADDRESS || "0x4fE3D834032E022049a1c904016C02f95A4f94A9";
 
 // ─── Shared atoms ─────────────────────────────────────────────────────────────
 function Btn({ onClick, disabled, loading, children, variant = "primary" }) {
@@ -131,6 +131,8 @@ export default function DemoPage() {
 
   async function runPreflight() {
     if (!wallet || !merchantAddr) return;
+    if (merchantAddr.toLowerCase() === wallet.address.toLowerCase())
+      return setError("Merchant address cannot be the same as your connected wallet. Use a different address.");
     setBusy(true); setError(null);
     const steps = [
       { label:"A-Pass verification — payer identity",    status:"pending" },
