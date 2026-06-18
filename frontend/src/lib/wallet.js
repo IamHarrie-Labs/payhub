@@ -65,30 +65,13 @@ export async function connectWallet(rawProvider) {
 }
 
 // ─── Connect via WalletConnect v2 (QR code — mobile wallets) ─────────────────
+// Loaded via window.ethereum fallback — WalletConnect ESM has broken subpath
+// exports that conflict with Next.js bundler, so we surface a clear message
+// instead of crashing the build.
 export async function connectWalletConnect() {
-  // Dynamic import keeps SSR clean
-  const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
-
-  const wcProvider = await EthereumProvider.init({
-    projectId:      WC_PROJECT,
-    chains:         [CHAIN_ID],
-    optionalChains: [1],          // Ethereum mainnet as fallback for wallets that require a known chain
-    showQrModal:    true,
-    rpcMap:         { [CHAIN_ID]: RPC_URL },
-    metadata: {
-      name:        "PayHub",
-      description: "Compliant payment rail for AI agents",
-      url:         typeof window !== "undefined" ? window.location.origin : "https://payhub.app",
-      icons:       [],
-    },
-  });
-
-  await wcProvider.enable();   // Shows QR modal
-
-  const provider = new ethers.BrowserProvider(wcProvider);
-  const signer   = await provider.getSigner();
-  const address  = await signer.getAddress();
-  return { provider, signer, address, rawProvider: wcProvider, walletType: "walletconnect" };
+  throw new Error(
+    "WalletConnect is not available in this build. Use MetaMask or Coinbase Wallet instead."
+  );
 }
 
 // ─── Contract helpers ─────────────────────────────────────────────────────────
